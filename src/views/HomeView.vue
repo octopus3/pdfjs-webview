@@ -1,18 +1,16 @@
 <template>
-  <div class="home">
-    <img alt="Vue logo" src="../assets/logo.png">
-    <HelloWorld msg="Welcome to Your Vue.js App"/>
+  <div>
+    <PdfViewer pdfUrl="/demo-annotated.pdf" />
   </div>
 </template>
 
 <script>
-// @ is an alias to /src
-import HelloWorld from '@/components/HelloWorld.vue'
+import PdfViewer from '@/components/pdfTemplate.vue';
 
 export default {
-  name: 'HomeView',
+  name: 'App',
   components: {
-    HelloWorld
+    PdfViewer
   }
-}
+};
 </script>
