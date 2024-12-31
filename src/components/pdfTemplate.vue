@@ -1,6 +1,6 @@
 <template>
-  <div class="pdf-viewer">
-    <canvas id="pdf-container" ref="pdfCanvas"></canvas>
+  <div class="pdf-viewer" ref="pdf-viewer">
+    <!-- <canvas id="pdf-container" ref="pdfCanvas"></canvas> -->
   </div>
 </template>
 
@@ -27,53 +27,85 @@ export default {
     async loadPdf() {
       const loadingTask = pdfjsLib.getDocument(this.pdfUrl);
       const pdf = await loadingTask.promise;
-      const page = await pdf.getPage(2);
-      const viewport = page.getViewport({ scale: 1 });
-      const canvas = this.$refs.pdfCanvas;
-      const context = canvas.getContext("2d");
-      canvas.height = viewport.height;
-      canvas.width = viewport.width;
-      const renderContext = {
-        canvasContext: context,
-        viewport: viewport,
-      };
-      await page.render(renderContext).promise;
-      const textContent = await page.getTextContent();
-      
-      console.log("textContent ==> ", textContent)
-      const pageText = textContent.items.map((item) => item.str).join(" ");
-      let fullText = `Page ${1}:\n${pageText}\n\n`;
+      const totalPages = pdf.numPages;
+      const pdfViewer = this.$refs['pdf-viewer']
+      const existingPdfBytes = await fetch(this.pdfUrl).then((res) => res.arrayBuffer());
+      const pdfDoc = await PDFDocument.load(existingPdfBytes)
 
-      console.log(`Extracted text from page ${1}`);
-      console.log("fullText ==> ", fullText)
-      context.fillStyle = '#FFFFFF'
-      context.fillRect(36, viewport.height - 695.2201 - 11.5,229.128,12)
-      context.fillStyle = '#000000'
-      context.font = "bold 12px sans-serif"
-      context.fillText("123456", 36, viewport.height - 695.2201 - 11.5)
-      console.log("drawRect")
-      this.modifyOriginalPdf(textContent, this.pdfUrl, page)
+      for(let pageNumber = 1; pageNumber <= totalPages; pageNumber ++) {
+        console.log(pageNumber)
+        const page = await pdf.getPage(pageNumber);
+        
+        console.log("######")
+        const canvas = document.createElement('canvas');
+        pdfViewer.appendChild(canvas)
+        const viewport = page.getViewport({ scale: 1 });
+        const context = canvas.getContext("2d");
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        const renderContext = {
+          canvasContext: context,
+          viewport: viewport,
+        };
+
+        await page.render(renderContext).promise;
+        const textContent = await page.getTextContent();
+        const annotations = await page.getAnnotations();
+        console.log("anno ==> ", annotations)
+        await this.modifyOriginalPdf(pdfDoc, textContent, page, pageNumber)
+      }
+     
+      
+      // context.fillStyle = '#FFFFFF'
+      // context.fillRect(36, viewport.height - 695.2201 - 11.5,229.128,12)
+      // context.fillStyle = '#000000'
+      // context.font = "bold 12px sans-serif"
+      // context.fillText("123456", 36, viewport.height - 695.2201 - 11.5)
+      
+      // this.modifyOriginalPdf(textContent, this.pdfUrl, page)
+
+      // const pdfBytes = await pdfDoc1.save();
+      // const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+      // const url = URL.createObjectURL(blob);
+
+      // const link = document.createElement('a');
+      // link.href = url;
+      // link.download = 'modified_original.pdf';
+      // link.click();
     },
 
-    async modifyOriginalPdf(translatedData, originalPdfUrl, page) {
-      const existingPdfBytes = await fetch(originalPdfUrl).then((res) => res.arrayBuffer());
-      const pdfDoc = await PDFDocument.load(existingPdfBytes)
+    async modifyOriginalPdf(pdfDoc, translatedData, page, pageNumber) {
+      // 获取所有页面
+      const pages = pdfDoc.getPages();
+      const pageText = translatedData.items.map((item) => item.str).join(" ");
+      let fullText = `Page ${pageNumber}:\n${pageText}\n\n`;
       const viewport = page.getViewport({ scale: 1 });
       for (const item of translatedData.items) {
-        console.log("item ==> ", item, viewport.height)
-        const pdfPage = pdfDoc.getPage(1);
-
-      //   // 覆盖原文本内容
-        // 绘制翻译后的文本
-        pdfPage.drawText("item.text???", {
-          x: 36,
-          y: 695.2201,
-          size: 12,
+        const pdfPage = pdfDoc.getPage(pageNumber - 1);
+        pdfPage.drawRectangle({
+          x: item.transform[4],
+          y: item.transform[5],
+          width: item.width,
+          height: item.height,
+          color: rgb(1, 1, 1) // 白色
+        })
+        // 覆盖原文本内容
+        pdfPage.drawText(item.str, {
+          x: item.transform[4],
+          y: item.transform[5],
+          size: item.transform[3],
           color: rgb(0, 0, 0), // 黑色文字
         });
+        // 绘制翻译后的文本
+        // pdfPage.drawText("item tesxtsta", {
+        //   x: 36,
+        //   y: 695.2201,
+        //   size: 12,
+        //   color: rgb(0, 0, 0), // 黑色文字
+        // });
       }
-
-        const pdfBytes = await pdfDoc.save();
+      const pdfBytes = await pdfDoc.save();
+      if(pageNumber == pages.length) {
         const blob = new Blob([pdfBytes], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
 
@@ -81,6 +113,7 @@ export default {
         link.href = url;
         link.download = 'modified_original.pdf';
         link.click();
+      }
     }
   }
 };
