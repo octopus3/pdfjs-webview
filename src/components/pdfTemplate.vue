@@ -16,7 +16,10 @@ export default {
       type: String,
       required: true,
     },
-    canDownload: false,
+    canDownload: {
+      type: Boolean,
+      default: true
+    },
     ratio: {
       type: Number,
       default: 1
@@ -97,6 +100,8 @@ export default {
         span.style.fontFamily = fontStyle.fontFamily
         span.style.lineHeight = `${totalHeight}px`;
         span.style.height = `${totalHeight}px`;
+        span.style.color = 'transparent'
+        span.style.cursor = 'text'
         // const graphicState = {}; // 存储图形状态
         // operatorObj.fnArray.forEach((fn, i) => {
         //   const args = operatorObj.argsArray[i];
@@ -134,8 +139,10 @@ export default {
 
         const link = document.createElement('a');
         link.href = url;
+        link.innerText = "download"
         link.download = 'modified_original.pdf';
-        link.click();
+        pdfViewer.appendChild(link)
+        // link.click();
       }
     }
   }
@@ -150,6 +157,15 @@ export default {
     position: relative;
     .text-layer {
       position: absolute;
+      opacity: .25;
+      &::selection {
+        background: blue;
+        background: AccentColor;
+      }
+      & span::selection {
+        color: transparent;
+        background: blue;
+      }
     }
   }
 canvas {
