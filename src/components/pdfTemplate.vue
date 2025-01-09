@@ -23,6 +23,10 @@ export default {
     ratio: {
       type: Number,
       default: 1
+    },
+    debugFont: {
+      type: Boolean,
+      default: false
     }
   },
   mounted() {
@@ -37,41 +41,74 @@ export default {
       const existingPdfBytes = await fetch(this.pdfUrl).then((res) => res.arrayBuffer());
       const pdfDoc = await PDFDocument.load(existingPdfBytes)
 
-      for(let pageNumber = 1; pageNumber <= totalPages; pageNumber ++) {
+      for(let pageNumber = 1; pageNumber <= totalPages; pageNumber += 2) {
         console.log(pageNumber)
-        const page = await pdf.getPage(pageNumber);
         
-        console.log("######")
-        const canvas = document.createElement('canvas');
-        pdfViewer.appendChild(canvas)
+        
+        const spread = document.createElement('div')
+        // 在渲染页数的同时右边也继续渲染
+        spread.classList.add('spread')
+        await this.renderPage(pdf, pdfDoc, pageNumber, spread, false);
+        await this.renderPage(pdf, pdfDoc, pageNumber, spread, true);
+        if (pageNumber + 1 <= totalPages) {
+          await this.renderPage(pdf, pdfDoc, pageNumber + 1, spread, false);
+          await this.renderPage(pdf, pdfDoc, pageNumber + 1, spread, true);
+        }
+        pdfViewer.appendChild(spread)
+      }
+    },
+
+    async renderPage(pdf, pdfDoc, pageNumber, spread, isRight) {
+      const page = await pdf.getPage(pageNumber);
+      const canvas = document.createElement('canvas');
+      const canvasContainer = document.createElement('div')
+      const pageContainer = document.createElement('div')
+      canvasContainer.classList.add("canvas-wrapper")
+        pageContainer.classList.add('page-container')
+        canvasContainer.appendChild(canvas)
+        pageContainer.appendChild(canvasContainer)
+        spread.appendChild(pageContainer)
+        
+        // pdfViewer.appendChild(spread)
         const viewport = page.getViewport({ scale: this.ratio });
         const context = canvas.getContext("2d");
+        // 设置canvas
+        canvas.height = this.ratio * viewport.height;
+        canvas.width = this.ratio * viewport.width;
+        // canvasRight.height = viewport.height
+        // canvasRight.width = viewport.width
+        canvas.id =  'canvas-left-' + pageNumber
+        // canvasRight.id = 'canvas-right-' + pageNumber
+        // end
+        // 创建文本画板
         const textLayer = document.createElement("div")
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
         textLayer.style.width = viewport.width + 'px'
         textLayer.style.height = viewport.height + 'px'
-        textLayer.style.top = (pageNumber - 1) * viewport.height + 'px'
+        textLayer.style.top = 0 + 'px'
+        // textLayer.style.top = ((pageNumber - 1) * viewport.height + pageNumber * 10 + (pageNumber - 1) ) + 'px'
         textLayer.classList.add("text-layer")
-        pdfViewer.appendChild(textLayer)
-        console.log("viewport ==> ", viewport)
+        pageContainer.appendChild(textLayer)
+        // end
         const renderContext = {
           canvasContext: context,
           viewport: viewport,
         };
-        console.log("viewport ==> ", viewport)
         await page.render(renderContext).promise;
+        // 如果属于右边的元素就给对应位置涂白
+        if(isRight) {
+          
+        }
+        // end
         const textContent = await page.getTextContent();
         const annotations = await page.getAnnotations();
         const operatorObj = await page.getOperatorList()
         console.log("textContent ==> ", textContent)
         console.log("anno ==> ", annotations)
         console.log("operatorList ==> ", operatorObj)
-        
-        
+
         await this.modifyOriginalPdf(pdfDoc, textContent, operatorObj, page, pageNumber, textLayer)
-      }
     },
+
 
     async modifyOriginalPdf(pdfDoc, translatedData, operatorObj, page, pageNumber, textLayer) {
       // 获取所有页面
@@ -100,7 +137,7 @@ export default {
         span.style.fontFamily = fontStyle.fontFamily
         span.style.lineHeight = `${totalHeight}px`;
         span.style.height = `${totalHeight}px`;
-        span.style.color = 'transparent'
+        span.style.color = this.debugFont ? '#000000' : 'transparent'
         span.style.cursor = 'text'
         // const graphicState = {}; // 存储图形状态
         // operatorObj.fnArray.forEach((fn, i) => {
@@ -141,7 +178,7 @@ export default {
         link.href = url;
         link.innerText = "download"
         link.download = 'modified_original.pdf';
-        pdfViewer.appendChild(link)
+        // pdfViewer.appendChild(link)
         // link.click();
       }
     }
@@ -167,7 +204,20 @@ export default {
         background: blue;
       }
     }
+    
   }
-canvas {
+.canvas-wrapper {
+  font-size: 0;
+}
+.page-container {
+  margin: 1px auto -8px;
+  border: 9px solid transparent;
+  position: relative;
+  display: inline-block;
+  vertical-align: middle;
+}
+.spread {
+ text-align: center;
+ white-space: normal;
 }
 </style>

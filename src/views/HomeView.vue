@@ -1,6 +1,6 @@
 <template>
   <div>
-    <PdfViewer pdfUrl="/demo-annotated.pdf" />
+    <PdfViewer pdfUrl="/demo-annotated.pdf" :debugFont="true" />
   </div>
 </template>
 
