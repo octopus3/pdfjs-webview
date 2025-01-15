@@ -85,6 +85,12 @@ export default {
         textLayer.style.width = viewport.width + 'px'
         textLayer.style.height = viewport.height + 'px'
         textLayer.style.top = 0 + 'px'
+        
+        if(isRight) {
+          textLayer.style.opacity = '1'
+        }else {
+          textLayer.setAttribute("translate", "no")
+        }
         // textLayer.style.top = ((pageNumber - 1) * viewport.height + pageNumber * 10 + (pageNumber - 1) ) + 'px'
         textLayer.classList.add("text-layer")
         pageContainer.appendChild(textLayer)
@@ -94,23 +100,18 @@ export default {
           viewport: viewport,
         };
         await page.render(renderContext).promise;
-        // 如果属于右边的元素就给对应位置涂白
-        if(isRight) {
-          
-        }
-        // end
+        
         const textContent = await page.getTextContent();
         const annotations = await page.getAnnotations();
         const operatorObj = await page.getOperatorList()
         console.log("textContent ==> ", textContent)
         console.log("anno ==> ", annotations)
         console.log("operatorList ==> ", operatorObj)
-
-        await this.modifyOriginalPdf(pdfDoc, textContent, operatorObj, page, pageNumber, textLayer)
+        await this.modifyOriginalPdf(pdfDoc, textContent, operatorObj, page, pageNumber, textLayer, context, isRight)
     },
 
 
-    async modifyOriginalPdf(pdfDoc, translatedData, operatorObj, page, pageNumber, textLayer) {
+    async modifyOriginalPdf(pdfDoc, translatedData, operatorObj, page, pageNumber, textLayer, canvasContext, isRight) {
       // 获取所有页面
       const pages = pdfDoc.getPages();
       const pageText = translatedData.items.map((item) => item.str).join(" ");
@@ -131,13 +132,18 @@ export default {
         const y = item.transform[5]; // Y坐标
         const fontSize = item.transform[0]
         span.style.position = 'absolute'
+        if(isRight) {
+          span.classList.add("right-text")
+        }else {
+          span.classList.add("left-text")
+        }
         span.style.left = `${x}px`;
         span.style.top = `${viewport.height - y - baselineTop}px`; // 减去字体大小来匹配 PDF 坐标系
         span.style.fontSize = `${fontSize}px`;
         span.style.fontFamily = fontStyle.fontFamily
         span.style.lineHeight = `${totalHeight}px`;
         span.style.height = `${totalHeight}px`;
-        span.style.color = this.debugFont ? '#000000' : 'transparent'
+        span.style.color = this.debugFont || isRight ? '#000000' : 'transparent'
         span.style.cursor = 'text'
         // const graphicState = {}; // 存储图形状态
         // operatorObj.fnArray.forEach((fn, i) => {
@@ -151,26 +157,32 @@ export default {
         //     console.log(`Text: ${text}, Fill Color: ${graphicState.fillColor}`);
         //   }
         // });
+        if(isRight) {
+          canvasContext.fillStyle = '#FFFFFF'
+          canvasContext.fillRect(x,  viewport.height - y - baselineTop, item.width, item.height);
+        }
         textLayer.appendChild(span)
        
         // 添加到容器中
-        pdfPage.drawRectangle({
-          x: item.transform[4],
-          y: item.transform[5],
-          width: item.width,
-          height: item.height,
-          color: rgb(1, 1, 1) // 白色
-        })
-        // 覆盖原文本内容
-        pdfPage.drawText(item.str, {
-          x: item.transform[4],
-          y: item.transform[5],
-          size: item.transform[3],
-          color: rgb(0, 0, 0), // 黑色文字
-        });
+        if(isRight) {
+          pdfPage.drawRectangle({
+            x: x,
+            y: y,
+            width: item.width,
+            height: item.height,
+            color: rgb(1, 1, 1) // 白色
+          })
+          // 覆盖原文本内容
+          pdfPage.drawText(item.str, {
+            x: x,
+            y: y,
+            size: item.transform[3],
+            color: rgb(0, 0, 0), // 黑色文字
+          });
+        }
       }
       const pdfBytes = await pdfDoc.save();
-      if(pageNumber == pages.length && this.canDownload) {
+      if(pageNumber == pages.length && isRight && this.canDownload) {
         const blob = new Blob([pdfBytes], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
 
@@ -178,8 +190,8 @@ export default {
         link.href = url;
         link.innerText = "download"
         link.download = 'modified_original.pdf';
-        // pdfViewer.appendChild(link)
-        // link.click();
+        pdfViewer.appendChild(link)
+        link.click();
       }
     }
   }
@@ -199,7 +211,7 @@ export default {
         background: blue;
         background: AccentColor;
       }
-      & span::selection {
+      & .left-text::selection {
         color: transparent;
         background: blue;
       }
